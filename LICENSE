@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 HoangNhutHuynh
+Copyright (c) 2026 Hoang Nhut Huynh
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+The MIT terms above cover the source code only. The label tables under
+`results/` are derived from PTB-XL, Chapman-Shaoxing/Ningbo, CODE-15% and
+CODE-test, which carry their own licenses. Anyone redistributing those files
+must follow the terms of the original datasets.
