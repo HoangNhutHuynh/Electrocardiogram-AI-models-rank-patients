@@ -1,0 +1,35 @@
+# Stage 5 fairness-aware adaptation (CALM-ECG full method).
+# Ablations: w_dro: 0 / w_con: 0 / lora_top_blocks: 0 — one switch per run.
+run_name: "adapt_heldout-ptbxl_seed0"
+held_out: "ptbxl"
+seed: 0
+pretrain_ckpt: "results/stage4/pretrain_heldout-ptbxl_seed0/ckpt_best.pt"
+
+data_root: "C:/Hoang/ECG/Data"
+cohort_dirs:
+  ptbxl: "PTB-XL v1.0.3"
+  chapman: "ECG-arrhythmia"
+  code15: "CODE-15%"
+  code_test: "CODE-test"
+
+# LoRA (hybrid top-block placement)
+lora_top_blocks: 2
+lora_r: 8
+lora_alpha: 16
+dropout: 0.1
+
+# fairness objective
+w_dro: 0.5                 # weight of the GroupDRO term
+dro_eta: 0.01
+w_con: 0.2                 # weight of fair-SupCon
+con_group_weight: 1.0      # extra weight on cross-group positive pairs
+
+# data / optimization
+crop_len: 2500
+batch_size: 64
+num_workers: 4
+epochs: 10
+lr: 1.0e-3
+weight_decay: 0.01
+grad_clip: 1.0
+val_max_batches: 400       # val subset per epoch; full val at stage 6

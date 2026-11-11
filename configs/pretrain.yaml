@@ -1,0 +1,34 @@
+# Stage 4 SSL pretraining — defaults sized for RTX 5060 8GB / 32GB RAM.
+# One run per LODO fold: set held_out and run_name together.
+run_name: "pretrain_heldout-ptbxl_seed0"
+held_out: "ptbxl"            # this cohort is EXCLUDED from pretraining
+seed: 0                      # repeat with 1, 2 for the 3-seed protocol
+
+data_root: "C:/Hoang/ECG/Data"
+cohort_dirs:
+  ptbxl: "PTB-XL v1.0.3"
+  chapman: "ECG-arrhythmia"
+  code15: "CODE-15%"
+  code_test: "CODE-test"
+
+# model (~4M params)
+d_model: 256
+n_layers: 6
+n_state: 64
+dropout: 0.1
+
+# data
+crop_len: 2500               # 5 s @ 500 Hz
+batch_size: 64
+num_workers: 4               # Windows spawn-safe (handles opened per worker)
+
+# SSL objective
+mask_ratio: 0.4
+mask_span: 100               # 0.2 s contiguous spans
+
+# optimization
+epochs: 20
+lr: 3.0e-4
+weight_decay: 0.01
+grad_clip: 1.0
+log_every: 100

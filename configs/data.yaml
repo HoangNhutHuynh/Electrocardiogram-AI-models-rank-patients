@@ -1,0 +1,52 @@
+# CALM-ECG data configuration
+# ASSUMPTION: data_root is the local Windows layout at C:\Hoang\ECG\Data
+data_root: "C:/Hoang/ECG/Data"
+
+cohorts:
+  ptbxl:
+    dir: "PTB-XL v1.0.3"
+    database_csv: "ptbxl_database.csv"
+    expected_records: 21799
+    expected_patients: 18869
+    sampling_rate_hz: 500          # use records500
+  chapman:                          # Chapman-Shaoxing + Ningbo (PhysioNet ecg-arrhythmia)
+    dir: "ECG-arrhythmia"
+    records_file: "RECORDS"
+    snomed_csv: "ConditionNames_SNOMED-CT.csv"
+    expected_records: 45152
+    sampling_rate_hz: 500
+  code15:
+    dir: "CODE-15%"
+    exams_csv: "exams.csv"
+    expected_records: 345779
+    expected_patients: 233770
+    sampling_rate_hz: 400
+  code_test:
+    dir: "CODE-test"
+    tracings: "ecg_tracings.hdf5"
+    attributes_csv: "attributes.csv"
+    gold_csv: "annotations/gold_standard.csv"
+    expected_records: 827
+    sampling_rate_hz: 400
+  samitrop:
+    dir: "SaMi-Trop"
+    hdf5: "exams.hdf5"
+    expected_records: 1631
+    sampling_rate_hz: 400
+  mimic:                            # NOT DOWNLOADED YET — verify will report "missing"
+    dir: "MIMIC-IV-ECG v1.0"
+    expected_records: null          # fill after download (~800k)
+    sampling_rate_hz: 500
+
+# PTB-XL scp_codes likelihood threshold for a positive label.
+# ASSUMPTION: 0 = include every listed statement (CinC-2021 convention).
+ptbxl_min_likelihood: 0
+
+# Harmonized 6-label space (strict 4-cohort intersection)
+labels: [AF, 1dAVb, RBBB, LBBB, SB, STach]
+
+# LODO settings
+lodo:
+  source_cohorts: [ptbxl, chapman, code15, mimic]
+  val_fraction: 0.10               # patient-level, within source cohorts
+  seed: 20260101
