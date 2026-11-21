@@ -169,3 +169,31 @@ Labelled as exploratory in the manuscript; no confirmatory claim rests on them.
   labels with < 3 local positives keep source-val thresholds), evaluated on
   the remaining records, readers scored on the same records; plus an
   in-sample oracle upper bound. Script: scripts/explore_local_recalibration.py.
+
+- E4 (2026-11-14, written BEFORE any ResNet run was trained or evaluated):
+  architecture control. Question: do the LODO gap, the conformal coverage
+  failure and the decision-level failure depend on the state-space encoder?
+  Backbone: dilated residual CNN (src/calm_ecg/models/resnet.py), same stem,
+  LayerNorm instead of BatchNorm (BatchNorm would adapt its statistics to the
+  held-out cohort), 4,079,872 encoder parameters vs 4,084,480 for S4D,
+  LoRA trainable fraction 1.18% vs 1.47%. Pipeline, splits, pretraining
+  recipe, adaptation recipe and evaluation unchanged; one pretrained encoder
+  per fold (seed 0); ERM only, adaptation seeds 0, 1, 2; all three folds.
+  Run names carry the suffix "_resnet"; stage7 reports them as a separate
+  variant "ERM (resnet)" and they never enter H1, Table II or the CODE-test
+  comparison of the main model. Reported in the supplement as a sensitivity
+  analysis. What would count as replication, fixed now: the ResNet ERM
+  model shows (a) a LODO macro-AUROC gap in the same ordering across folds
+  (Chapman largest), and (b) positive-class label-conditional coverage on
+  the Chapman fold below 0.70. Either failing is reported as a failure.
+  Every evaluation is appended to results/stage6/EVAL_LEDGER.csv as usual.
+
+- E4b (2026-11-15, written BEFORE any fairness-aware ResNet run was trained
+  or evaluated; the ResNet ERM runs of E4 were still in progress): H1
+  sensitivity on the architecture control. Same two variants as H1 (group
+  DRO, w_dro = 0.5, eta = 0.01; DRO + fair-SupCon, w_con = 0.05), seeds
+  0, 1, 2, all three folds, same pretrained ResNet encoders as E4. The
+  H1 decision rule is applied unchanged, but each variant is compared with
+  the ResNet ERM model only; no quantity is pooled across architectures,
+  and the pre-registered H1 verdict for the state-space encoder is not
+  revised by this analysis. Reported in the supplement next to E4.

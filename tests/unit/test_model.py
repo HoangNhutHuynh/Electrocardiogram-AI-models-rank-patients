@@ -107,14 +107,21 @@ def test_eval_determinism():
 
 
 def _kernel_complex_reference(k, L):
-    """The original complex-arithmetic S4D-Lin kernel (pre-2026-11-10)."""
-    dt = torch.exp(k.log_dt)
-    A = -torch.exp(k.log_A_real) + 1j * k.A_imag
-    C = torch.view_as_complex(k.C.contiguous())
-    dtA = A * dt.unsqueeze(-1)
-    K = dtA.unsqueeze(-1) * torch.arange(L)
-    C2 = C * (torch.exp(dtA) - 1.0) / A
-    return 2 * torch.einsum("dn,dnl->dl", C2, torch.exp(K)).real
+    """The original complex-arithmetic S4D-Lin kernel (pre-2026-11-10).
+
+    Computed in NumPy complex128, not torch: torch's complex exp/einsum is
+    the nondeterministic path on the Windows CPU build that motivated the
+    real-arithmetic kernel, so a torch reference made this test flaky.
+    """
+    import numpy as np
+    dt = np.exp(k.log_dt.detach().double().numpy())
+    A = -np.exp(k.log_A_real.double().numpy()) + 1j * k.A_imag.double().numpy()
+    C = k.C.detach().double().numpy()
+    C = C[..., 0] + 1j * C[..., 1]
+    dtA = A * dt[:, None]
+    K = dtA[..., None] * np.arange(L)
+    C2 = C * (np.exp(dtA) - 1.0) / A
+    return torch.from_numpy(2 * np.einsum("dn,dnl->dl", C2, np.exp(K)).real)
 
 
 def test_real_kernel_matches_complex_reference():

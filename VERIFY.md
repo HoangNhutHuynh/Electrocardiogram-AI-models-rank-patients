@@ -17,22 +17,25 @@ files by scripts, never typed by hand.
 | Patient-level splits, leakage check | `results/splits_lodo.json` | `scripts/stage3_splits.py` |
 | Table II, LODO results | `results/stage7/lodo_test.csv` | `scripts/stage7_tables.py` |
 | Per-run metrics, per-label AUROC, ECE, conformal coverage | `results/stage6/<run>/metrics.json` | `scripts/stage6_eval.py` |
-| H1 verdict, per-fold and pooled CI (Fig. 3) | `results/stage7/h1_verdict.json` | `scripts/stage7_tables.py` |
+| H1 verdict, per-fold and pooled CI (Fig. 3a) | `results/stage7/h1_verdict.json`, keys `DRO`, `DRO+SupCon0.05` | `scripts/stage7_tables.py` |
+| Architecture control E4 (Section IV-G, Table S12) | `results/stage7/lodo_test.csv`, variants ending in `(resnet)` | `scripts/stage7_tables.py` |
+| Architecture control E4b, H1 on the convolutional encoder (Fig. 3b) | `results/stage7/h1_verdict.json`, keys ending in `(resnet)` | `scripts/stage7_tables.py` |
 | H2 verdict, three folds (Section IV-C) | `results/stage7/h2_verdict.json` | `scripts/stage7_tables.py` |
 | Ablations and all validation scores (Table S5) | `results/stage7/ablation_val.csv` | `scripts/stage7_tables.py` |
 | CODE-test against human readers (Table III, Fig. 6) | `results/code_test/summary.json` | `scripts/eval_code_test.py` |
 | No CODE-test record inside CODE-15% | `results/codetest_overlap.json` | `scripts/check_codetest_overlap.py` |
 | E1, EM prior shift (Fig. 5c) | `results/exploratory/label_shift/` | `scripts/explore_label_shift.py` |
 | E2, AF rescored against flutter (Fig. 5b) | `results/exploratory/af_afl/summary.csv` | `scripts/explore_af_afl.py` |
-| E3, local thresholds (Fig. 7) | `results/exploratory/local_recalibration/` | `scripts/explore_local_recalibration.py` |
+| E3, local thresholds (Supplementary Fig. S3) | `results/exploratory/local_recalibration/` | `scripts/explore_local_recalibration.py` |
 | Source data of every figure | `results/figure_data/*.csv` | `scripts/export_figure_data.py` |
-| Figures 2 to 7, S1, S2 | `figures/out/` | `figures/make_figures.m` |
-| Supplementary Tables S1 to S11 | `manuscript/supp_tables.tex` | `scripts/make_supplement_tables.py` |
+| Figures 2 to 6 and S1 to S3 (`Fig7_local_recalibration` is Fig. S3) | `figures/out/` | `figures/make_figures.m` |
+| Supplementary Tables S1 to S12 | `manuscript/supp_tables.tex` | `scripts/make_supplement_tables.py` |
+| Graphical abstract | `figures/graphical_abstract/` | `make_graphical_abstract.py`; its numbers are copied from the files above and listed, with their source, at the top of the script |
 
 ## Three checks that need nothing but this repository
 
 ```bash
-pytest tests/unit -q                      # 60 tests of the metrics, conformal,
+pytest tests/unit -q                      # 67 tests of the metrics, conformal,
                                           # bootstrap, splits and label code
 python scripts/make_supplement_tables.py  # rewrites every supplementary table
                                           # from results/, nothing hard-coded
@@ -48,20 +51,36 @@ recomputed independently of the code used here.
 `PREREGISTRATION.md` holds hypothesis H1 and three dated amendments:
 label-conditional conformal calibration (Amendment 1), hypothesis H2
 (Amendment 2, written after the PTB-XL fold and before the other two), and the
-CODE-test analysis plan (Amendment 3).
+CODE-test analysis plan (Amendment 3). It also records the exploratory
+analyses E1 to E4b; E4 and E4b, the architecture control, were written after
+the confirmatory results and before any of their models was trained. One
+sentence of E4 says BatchNorm would adapt its statistics to the held-out
+cohort; that reasoning was wrong (in eval mode BatchNorm keeps its source
+statistics). The entry is left as dated, the correction is in
+`src/calm_ecg/models/resnet.py`, and the encoder uses LayerNorm as registered.
 
 Stage 6 appends one timestamped row per evaluation of a held-out cohort:
 
-- `results/stage6/EVAL_LEDGER.csv`, 36 rows. Nine of them are re-evaluations
-  of the PTB-XL fold, run after Amendment 1 changed the conformal calibration.
-  The manuscript reports this.
+- `results/stage6/EVAL_LEDGER.csv`: 36 rows for the main analysis, nine of which are
+  re-evaluations of the PTB-XL fold run after Amendment 1 changed the conformal calibration
+  (the manuscript reports this), followed by the rows of the architecture control (E4, E4b),
+  whose run names contain `_resnet`.
 - `results/code_test/EVAL_LEDGER.csv`, 9 rows.
+
+Two training logs, `results/stage5/adapt_heldout-ptbxl_seed1_w_dro0_w_con0/log.csv` and
+`..._seed2_w_dro0_w_con0/log.csv`, list each of their 10 epochs twice with identical values.
+This comes from an early version of the logger that appended instead of overwriting when a
+run was restarted; the checkpoints were trained on 2026-11-08, before the first held-out
+evaluation on 2026-11-09, and Table S11 counts each epoch once.
 
 ## What this repository does not contain
 
 - **The raw ECG signals.** PTB-XL, Chapman-Shaoxing, Ningbo, CODE-15% and
   CODE-test must be obtained from PhysioNet and Zenodo under their own terms.
 - **Model checkpoints**, 1.3 GB in total. Stages 4 and 5 reproduce them.
+- **Local paths.** Run configurations under `results/stage4` and
+  `results/stage5`, `results/MANIFEST.json` and the CODE-test ledger record
+  the data path of the machine that produced them; they are kept as written.
 - **MIMIC-IV-ECG.** It was considered and left out: its labels are
   machine-generated report statements that would need a separate mapping.
 
@@ -76,6 +95,8 @@ inferred from the code:
   seeds is reported as a standard deviation but is not inside those intervals.
 - One encoder was pretrained per fold, so variation due to pretraining is not
   measured.
+- Two compact encoders were tested, pretrained the same way; the
+  convolutional control was not evaluated on CODE-test.
 - E1, E2 and E3 were designed after the confirmatory results were known and
   are labeled exploratory everywhere they appear.
 - In the CODE-15% fold, 23 of 96 conformal cells fell back to the threshold
