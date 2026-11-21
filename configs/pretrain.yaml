@@ -4,17 +4,21 @@ run_name: "pretrain_heldout-ptbxl_seed0"
 held_out: "ptbxl"            # this cohort is EXCLUDED from pretraining
 seed: 0                      # repeat with 1, 2 for the 3-seed protocol
 
-data_root: "C:/Hoang/ECG/Data"
+data_root: "path/to/ECG/Data"   # edit before running stages 0 to 5
 cohort_dirs:
   ptbxl: "PTB-XL v1.0.3"
   chapman: "ECG-arrhythmia"
   code15: "CODE-15%"
   code_test: "CODE-test"
 
-# model (~4M params)
+# model (~4M params). arch: s4d | resnet (architecture control, same budget);
+# --arch on stage4/stage5 overrides this and suffixes the run name.
+arch: "s4d"
 d_model: 256
 n_layers: 6
-n_state: 64
+n_state: 64                  # s4d only
+kernel_size: 9               # resnet only
+conv_groups: 4               # resnet only
 dropout: 0.1
 
 # data

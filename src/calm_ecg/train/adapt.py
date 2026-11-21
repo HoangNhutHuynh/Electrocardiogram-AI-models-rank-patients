@@ -23,7 +23,8 @@ import yaml
 from calm_ecg.data.dataset import EcgDataset
 from calm_ecg.eval.metrics import masked_macro_auroc, worst_group_auroc
 from calm_ecg.models.lora import apply_lora, trainable_fraction
-from calm_ecg.models.s4d import ClsModel, S4DEncoder
+from calm_ecg.models import build_encoder
+from calm_ecg.models.s4d import ClsModel
 from calm_ecg.train.fairness import (GroupDRO, fair_supcon,
                                      per_sample_masked_bce)
 from calm_ecg.train.pretrain import build_loaders, git_hash, set_seed
@@ -46,8 +47,7 @@ def load_adapted_model(state: dict) -> PooledClsModel:
     cfg = state["config"]
     pre = torch.load(Path(cfg["pretrain_ckpt"]), map_location="cpu",
                      weights_only=False)["config"]
-    enc = S4DEncoder(d_model=pre["d_model"], n_layers=pre["n_layers"],
-                     n_state=pre["n_state"], dropout=0.0)
+    enc = build_encoder(pre, 0.0)
     if cfg["lora_top_blocks"] > 0:
         apply_lora(enc, cfg["lora_top_blocks"], cfg["lora_r"], cfg["lora_alpha"])
     model = PooledClsModel(enc)
@@ -91,8 +91,7 @@ def run(cfg: dict, repo: Path) -> Path:
     pc = ck["config"]
     assert pc["held_out"] == cfg["held_out"], \
         f"pretrain ckpt fold ({pc['held_out']}) != adapt fold ({cfg['held_out']})"
-    enc = S4DEncoder(d_model=pc["d_model"], n_layers=pc["n_layers"],
-                     n_state=pc["n_state"], dropout=cfg["dropout"])
+    enc = build_encoder(pc, cfg["dropout"])
     enc_state = {k[len("encoder."):]: v for k, v in ck["model"].items()
                  if k.startswith("encoder.")}
     enc.load_state_dict(enc_state)

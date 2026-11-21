@@ -98,6 +98,8 @@ def main() -> int:
            "per_model": {}}
     preds = {}  # fold -> list of binary predictions (827, 6) over seeds
     for run in sorted((REPO / "results/stage5").glob("adapt_heldout-*_w_dro0_w_con0")):
+        if "_resnet" in run.name:   # CODE-test compares the main (s4d) model only
+            continue
         fold = run.name.split("_")[1].split("-")[1]
         if fold != "code15" and not in_pop_allowed:
             continue

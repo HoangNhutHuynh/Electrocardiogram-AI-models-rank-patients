@@ -5,7 +5,7 @@ held_out: "ptbxl"
 seed: 0
 pretrain_ckpt: "results/stage4/pretrain_heldout-ptbxl_seed0/ckpt_best.pt"
 
-data_root: "C:/Hoang/ECG/Data"
+data_root: "path/to/ECG/Data"   # edit before running stages 0 to 5
 cohort_dirs:
   ptbxl: "PTB-XL v1.0.3"
   chapman: "ECG-arrhythmia"

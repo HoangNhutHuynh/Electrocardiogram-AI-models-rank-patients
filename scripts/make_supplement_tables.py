@@ -76,7 +76,8 @@ for p in glob.glob(str(R / "stage6" / "*" / "metrics.json")):
     m = json.load(open(p))
     if m["run_name"] in runs:
         M.setdefault(runs[m["run_name"]], []).append(m["test"])
-variants = sorted({v for _, v in M}, key=lambda v: (v != "ERM", v))
+ARCH = "(resnet)"  # architecture control (E4/E4b): reported only in Table S12
+variants = sorted({v for _, v in M if ARCH not in v}, key=lambda v: (v != "ERM", v))
 rows = []
 for f in FOLDS:
     for v in variants:
@@ -107,6 +108,7 @@ table("Conformal prediction on held-out cohorts ($\\alpha=0.1$, mean of three se
 
 # ---- S5: validation scores incl. single-seed ablations --------------------------------
 a = pd.read_csv(R / "stage7" / "ablation_val.csv")
+a = a[~a.variant.str.contains(ARCH, regex=False)]
 VN = {"DRO+SupCon0.05": "DRO+SupCon", "DRO+SupCon0.2": "DRO+SupCon ($w=0.2$)",
       "SupCon0.2": "SupCon only ($w=0.2$)", "head-only": "Linear head only"}
 a["o"] = a.held_out.map(list(FOLDS).index)
@@ -114,8 +116,9 @@ a["v"] = a.variant.map(lambda v: (["ERM", "DRO", "DRO+SupCon0.05"] + list(VN)).i
 rows = [[FOLDS[r.held_out], VN.get(r.variant, r.variant), int(r.val_macro_auroc_count),
          f"{r.val_macro_auroc_mean:.4f}", f"{r.val_worst_group_mean:.4f}"]
         for r in a.sort_values(["o", "v"]).itertuples()]
-table("Source-validation macro-AUROC and worst-group AUROC of all trained variants (mean over the "
-      "given number of seeds). Single-seed rows are ablations run on the PTB-XL fold only; "
+table("Source-validation macro-AUROC and worst-group AUROC of all trained variants, on the 25,600-record "
+      "subset used for checkpoint selection (mean over the given number of seeds). Single-seed rows are "
+      "ablations run on the PTB-XL fold only; "
       "$w$ is the weight of the contrastive term.",
       "tab:s-val", ["Held out", "Variant", "Seeds", "Macro-AUROC", "Worst group"], rows)
 
@@ -163,28 +166,76 @@ table("CODE-test: difference in macro-F1 between each model and each reader, wit
       "confidence interval over the 827 ECGs.", "tab:s-codetest-delta",
       ["Model", "Reader", "$\\Delta$", "95\\% CI"], rows)
 
-# ---- S8: local threshold reselection (E3) ---------------------------------------------
+# ---- S10: local threshold reselection (E3), one row per reader/model, one column per k ----
 l = pd.read_csv(R / "exploratory" / "local_recalibration" / "summary.csv")
-rows = [[r.k, r.who.replace("code15", "external").replace("chapman", "in-pop. A").replace("ptbxl", "in-pop. B")
-         .replace("_", " ").replace("dnn", "DNN"), f3(r.macro_f1_mean), "--" if pd.isna(r._4) else f"[{r._4:.3f}, {r._5:.3f}]"]
-        for r in l.itertuples()]
+who = lambda w: (w.replace("code15", "external").replace("chapman", "in-pop. A").replace("ptbxl", "in-pop. B")
+                 .replace("_", " ").replace("dnn", "DNN").replace("ERM ", ""))
+cap = lambda t: t[:1].upper() + t[1:]
+ks = [k for k in ["25", "50", "100", "200"] if k in set(l.k.astype(str))]
+cell = lambda r: f"{r.macro_f1_mean:.3f} [{r._4:.2f}, {r._5:.2f}]"
+oracle = {who(w).split(" (")[0]: f"{v:.3f}" for w, v in
+          l[l.k.astype(str) == "all"].set_index("who").macro_f1_mean.items()}
+rows = []
+for w in l[l.k.astype(str) == ks[0]].who:
+    rr = [cell(next(l[(l.k.astype(str) == k) & (l.who == w)].itertuples())) for k in ks]
+    base = who(w).split(" (")[0]
+    rows.append([cap(who(w))] + rr + [oracle.get(base, "") if "local" in w else ""])
 table("Exploratory analysis E3: macro-F1 on the remaining CODE-test records after re-selecting thresholds on "
-      "$k$ local ECGs (mean and 2.5th to 97.5th percentile over 200 random splits). In-pop. A: sources PTB-XL "
-      "and CODE-15\\%; in-pop. B: sources Chapman and CODE-15\\%. Readers are scored on the same records.",
-      "tab:s-local", ["$k$", "Reader or model", "Macro-F1", "Percentiles"], rows)
+      "$k$ local ECGs (mean and 2.5th to 97.5th percentile over 200 random splits). Oracle: thresholds chosen "
+      "on all 827 records (in-sample, optimistic). In-pop. A: sources PTB-XL and CODE-15\\%; in-pop. B: "
+      "sources Chapman and CODE-15\\%. Readers are scored on the same records.",
+      "tab:s-local", ["Reader or model"] + [f"$k={k}$" for k in ks] + ["Oracle"], rows)
 
 # ---- S9: compute ----------------------------------------------------------------------
 rows = []
 for stage, pat in [("Pretraining (20 epochs)", "stage4/*/log.csv"), ("Adaptation (10 epochs)", "stage5/*/log.csv")]:
     for f in FOLDS:
         # sec is the duration of each epoch
-        h = [pd.read_csv(p).sec.sum() / 3600 for p in glob.glob(str(R / pat)) if f"heldout-{f}_" in p]
+        h = [pd.read_csv(p).drop_duplicates("epoch", keep="last").sec.sum() / 3600
+             for p in glob.glob(str(R / pat)) if f"heldout-{f}_" in p and "_resnet" not in p]
         rows.append([stage, FOLDS[f], len(h), f"{np.mean(h):.1f}"])
-table("Wall-clock training time per run on one 8-GB GPU (mean over the listed runs; sum of the per-epoch times "
-      "in each training log).", "tab:s-compute", ["Stage", "Held out", "Runs", "Hours"], rows)
+table("Wall-clock training time per run of the state-space encoder on one 8-GB GPU (mean over the listed "
+      "runs; total time over all epochs).", "tab:s-compute", ["Stage", "Held out", "Runs", "Hours"], rows)
+
+# ---- S12: architecture control (E4, E4b): state-space vs convolutional encoder --------------
+def arch_rows():
+    """Rows for every (encoder, objective) present; E4b rows appear once those runs are evaluated."""
+    # variant names come from stage7, so single-seed ablations (e.g. SupCon0.2) never enter this table
+    keep = {"ERM": "ERM", "DRO": "DRO", "DRO+SupCon0.05": "DRO+SupCon"}
+    G = {}
+    for p in glob.glob(str(R / "stage6" / "*" / "metrics.json")):
+        m = json.load(open(p)); r = m["run_name"]
+        v = runs.get(r, (None, ""))[1]
+        enc = "Convolutional" if v.endswith(ARCH) else "State-space"
+        o = keep.get(v.replace(" " + ARCH, ""))
+        if o:
+            G.setdefault((m["held_out"], enc, o), []).append(m)
+    out_rows = []
+    for f in FOLDS:
+        for enc in ["State-space", "Convolutional"]:
+            for o in ["ERM", "DRO", "DRO+SupCon"]:
+                ms = G.get((f, enc, o))
+                if not ms:
+                    continue
+                t = [m["test"] for m in ms]
+                val = np.mean([m["val_source"]["macro_auroc"] for m in ms])
+                tm = [x["macro_auroc"] for x in t]
+                lc = [x["conformal_label_conditional"] for x in t]
+                g4 = np.mean([x["per_group"]["4"]["positive_coverage"] for x in lc])
+                out_rows.append([FOLDS[f], enc, o, len(ms), f"{np.mean(tm):.3f}", f"{100 * (val - np.mean(tm)):.2f}",
+                                 f"{np.mean([x['worst_group_auroc'] for x in t]):.3f}",
+                                 f3(float(np.mean([x["per_class"]["AF"]["auroc"] for x in t]))),
+                                 f3(float(np.mean([x["ece_temp_scaled"] for x in t]))),
+                                 f3(float(np.mean([x["positive_coverage"] for x in lc]))), f3(float(g4))])
+    return out_rows
+table("Architecture control (E4, E4b): the state-space encoder of the main text and a parameter-matched dilated "
+      "convolutional encoder, same pipeline (mean of the given number of seeds). Gap: full source-validation "
+      "macro-AUROC minus held-out macro-AUROC, in points. Cov$^{+}$: positive-class coverage of label-conditional "
+      "conformal sets (target 0.90); F$<$40: the same for women under 40.", "tab:s-arch",
+      ["Held out", "Encoder", "Objective", "Seeds", "AUROC", "Gap", "Worst group", "AF AUROC", "ECE",
+       "Cov$^{+}$", "F$<$40"], arch_rows())
 
 led = [len(pd.read_csv(R / p / "EVAL_LEDGER.csv")) for p in ["stage6", "code_test"]]
-out.append("%% ledger rows: stage6=%d code_test=%d\n" % tuple(led))
 assert len(out) == 12
 OUT.write_text("\n".join(out), encoding="utf-8")
 print("wrote", OUT, "| ledger rows", led)

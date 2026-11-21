@@ -26,6 +26,14 @@ import yaml
 
 
 def variant_name(cfg: dict) -> str:
+    # The architecture control is its own variant, so it is never averaged
+    # into the s4d rows; configs from before it carry no 'arch' key.
+    arch = cfg.get("arch", "s4d")
+    name = _objective_name(cfg)
+    return name if arch == "s4d" else f"{name} ({arch})"
+
+
+def _objective_name(cfg: dict) -> str:
     if cfg.get("lora_top_blocks", 0) == 0:
         return "head-only"
     w_dro, w_con = cfg.get("w_dro", 0), cfg.get("w_con", 0)
@@ -99,12 +107,16 @@ def h1_analysis(repo: Path, s6: pd.DataFrame, n_boot: int = 1000) -> dict:
         return z["test_y"], z["test_g"], 1 / (1 + np.exp(-z["test_logits"]))
 
     out = {}
-    for variant in ("DRO", "DRO+SupCon0.05"):
+    # Each architecture is compared with its own ERM; nothing is pooled
+    # across architectures (E4b in PREREGISTRATION.md).
+    pairs = [(v + sfx, "ERM" + sfx) for sfx in ("", " (resnet)")
+             for v in ("DRO", "DRO+SupCon0.05")]
+    for variant, erm in pairs:
         fold_res, macro_drop = {}, {}
         for fold in sorted(s6["held_out"].unique()):
             sub = s6[s6["held_out"] == fold]
             rv = sub[sub["variant"] == variant]["run_name"].tolist()
-            re = sub[sub["variant"] == "ERM"]["run_name"].tolist()
+            re = sub[sub["variant"] == erm]["run_name"].tolist()
             if not rv or not re:
                 continue
             ys, pv, pe = [], [], []
@@ -119,11 +131,11 @@ def h1_analysis(repo: Path, s6: pd.DataFrame, n_boot: int = 1000) -> dict:
                                       np.nan_to_num(y0, nan=-1))
                        and np.array_equal(g, g0) for y, g in ys), \
                 f"[{fold}] test records differ across models — cannot pair"
-            print(f"H1 {variant} vs ERM, fold {fold}: bootstrapping "
+            print(f"H1 {variant} vs {erm}, fold {fold}: bootstrapping "
                   f"{n_boot}x on {len(y0)} records...", flush=True)
             fold_res[fold] = fold_delta_draws(y0, g0, pv, pe, n_boot=n_boot, progress=True)
             macro_drop[fold] = float(
-                sub[sub["variant"] == "ERM"]["test_macro_auroc"].mean()
+                sub[sub["variant"] == erm]["test_macro_auroc"].mean()
                 - sub[sub["variant"] == variant]["test_macro_auroc"].mean())
         if fold_res:
             out[variant] = pooled_verdict(fold_res, macro_drop)

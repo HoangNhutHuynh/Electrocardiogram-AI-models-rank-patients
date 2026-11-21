@@ -20,7 +20,8 @@ import yaml
 from torch.utils.data import DataLoader
 
 from calm_ecg.data.dataset import EcgDataset
-from calm_ecg.models.s4d import MaskedReconModel, S4DEncoder, count_params
+from calm_ecg.models import build_encoder
+from calm_ecg.models.s4d import MaskedReconModel, count_params
 
 
 def set_seed(seed: int) -> None:
@@ -76,8 +77,7 @@ def run(cfg: dict, repo: Path) -> Path:
     cfg["git_hash"] = git_hash(repo)
     (out / "config.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
 
-    enc = S4DEncoder(d_model=cfg["d_model"], n_layers=cfg["n_layers"],
-                     n_state=cfg["n_state"], dropout=cfg["dropout"])
+    enc = build_encoder(cfg, cfg["dropout"])
     model = MaskedReconModel(enc).to(device)
     print(f"params: {count_params(model):,} | device: {device} | amp: {amp_dtype}",
           flush=True)

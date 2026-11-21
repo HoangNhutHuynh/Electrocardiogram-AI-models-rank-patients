@@ -1,6 +1,6 @@
 # CALM-ECG data configuration
-# ASSUMPTION: data_root is the local Windows layout at C:\Hoang\ECG\Data
-data_root: "C:/Hoang/ECG/Data"
+# Set data_root to the folder that holds the downloaded datasets
+data_root: "path/to/ECG/Data"   # edit before running stages 0 to 5
 
 cohorts:
   ptbxl:

@@ -33,8 +33,10 @@ sig = lambda z: 1 / (1 + np.exp(-z))  # noqa: E731
 
 
 def variant(run: str) -> str:
-    return "ERM" if "w_dro0_w_con0" in run else (
+    v = "ERM" if "w_dro0_w_con0" in run else (
         "DRO+SupCon" if "w_con0.05" in run else "DRO")
+    # architecture control: a separate variant, ignored by make_figures.m (VAR)
+    return v + " (resnet)" if "_resnet" in run else v
 
 
 def save(df: pd.DataFrame, name: str) -> None:
@@ -71,6 +73,7 @@ save(pd.DataFrame(lodo), "fig2a_lodo.csv")
 save(pd.DataFrame(perclass), "fig2b_perclass_auroc.csv")
 save(pd.DataFrame(conf), "fig4_conformal_groups.csv")
 save(pd.DataFrame(perclass_all), "figS1_perclass_variants.csv")
+wg = [w for w in wg if "(resnet)" not in w["variant"]]  # Fig. S2: state-space encoder only
 _val = pd.read_csv(RES / "stage7/runs_stage5_raw.csv")[["run", "val_worst_group"]]
 _wg = pd.DataFrame(wg).merge(_val, on="run", validate="one_to_one")
 assert len(_wg) == len(wg) == 27, "expected 9 runs x 3 folds with a validation score each"
@@ -82,13 +85,17 @@ rows = []
 for v, d in h1.items():
     if "ci95_per_fold" not in d:
         sys.exit("h1_verdict.json lacks ci95_per_fold: re-run scripts/stage7_tables.py")
+    # each variant is compared with ERM of the same encoder (H1 for state-space, E4b for convolutional)
+    enc = "Convolutional" if "(resnet)" in v else "State-space"
+    base = "DRO+SupCon" if "SupCon" in v else "DRO"
     for f in d["folds"]:
-        rows.append({"variant": "DRO+SupCon" if "SupCon" in v else v, "fold": FOLD_NAME[f],
+        rows.append({"encoder": enc, "variant": base, "fold": FOLD_NAME[f],
                      "delta": d["delta_per_fold"][f], "lo": d["ci95_per_fold"][f][0],
                      "hi": d["ci95_per_fold"][f][1]})
-    rows.append({"variant": "DRO+SupCon" if "SupCon" in v else v, "fold": "Pooled",
+    rows.append({"encoder": enc, "variant": base, "fold": "Pooled",
                  "delta": d["pooled_delta"], "lo": d["pooled_ci95"][0],
                  "hi": d["pooled_ci95"][1]})
+assert len(rows) == 16, "expected 2 encoders x 2 variants x (3 folds + pooled)"
 save(pd.DataFrame(rows), "fig3_h1_forest.csv")
 
 # ---- Fig. 5a: prevalence by cohort (Chapman split by hospital) ------------

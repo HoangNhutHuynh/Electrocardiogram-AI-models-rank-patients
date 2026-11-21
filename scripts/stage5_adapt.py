@@ -26,6 +26,9 @@ def main() -> int:
     ap.add_argument("--pretrain-seed", type=int, default=None,
                     help="encoder checkpoint seed (default 0: one pretrained "
                          "encoder per fold, adapt seeds vary — note in Methods)")
+    ap.add_argument("--arch", default="s4d", choices=["s4d", "resnet"],
+                    help="encoder; non-default is suffixed onto the run name "
+                         "so the s4d results keep their paths")
     ap.add_argument("--set", action="append", default=[],
                     help="override, e.g. --set w_dro=0 --set lora_r=16")
     args = ap.parse_args()
@@ -43,11 +46,13 @@ def main() -> int:
         cfg[k] = yaml.safe_load(v)
         suffix += f"_{k}{v}"
     p_seed = args.pretrain_seed if args.pretrain_seed is not None else 0
+    cfg["arch"] = args.arch   # read by stage7 to keep architectures apart
+    tag = "" if args.arch == "s4d" else f"_{args.arch}"
     cfg["pretrain_ckpt"] = str(
         repo / f"results/stage4/pretrain_heldout-{cfg['held_out']}"
-               f"_seed{p_seed}/ckpt_best.pt")
+               f"_seed{p_seed}{tag}/ckpt_best.pt")
     cfg["run_name"] = (f"adapt_heldout-{cfg['held_out']}"
-                       f"_seed{cfg['seed']}{suffix}")
+                       f"_seed{cfg['seed']}{tag}{suffix}")
 
     out = run(cfg, repo)
     print(f"done. artifacts in {out}")
